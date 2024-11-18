@@ -123,7 +123,6 @@ const main = () => {
   const tree = new BPlusTree(4);
   let data = loadData();
 
-  // Insert all preloaded data into the tree
   data.forEach((entry) => tree.insert(entry.Word, entry.Meaning));
 
   const prompt = require("prompt-sync")();
@@ -141,13 +140,12 @@ const main = () => {
         const word = prompt("Enter the word: ");
         const meaning = prompt("Enter the meaning: ");
 
-        // Check if the word already exists
         if (tree.search(word)) {
           console.log(`The word "${word}" already exists in the dictionary.`);
         } else {
           tree.insert(word, meaning);
-          data.push({ Word: word.toLowerCase(), Meaning: meaning }); // Normalize to lowercase
-          saveData(data); // Save updated data to file
+          data.push({ Word: word.toLowerCase(), Meaning: meaning });
+          saveData(data);
           console.log(`The word "${word}" has been added to the dictionary.`);
         }
         break;

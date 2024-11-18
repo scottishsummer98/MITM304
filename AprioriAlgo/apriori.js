@@ -11,9 +11,10 @@ const transactions = [
   ["I1", "I2", "I3"],
 ];
 const minSupport = 2;
+const minConfidence = 0.5;
 //#endregion
 
-//#region Counting support of candidate items in transactions
+//#region Helper functions
 function countSupport(transactions, candidates) {
   const counts = new Map();
 
@@ -25,12 +26,9 @@ function countSupport(transactions, candidates) {
       }
     });
   });
-
   return counts;
 }
-//#endregion
 
-//#region  Generate candidate itemsets of size k from frequent (k-1)-itemsets
 function aprioriGen(frequentItemsets) {
   const candidates = [];
   const items = [...frequentItemsets];
@@ -39,8 +37,6 @@ function aprioriGen(frequentItemsets) {
     for (let j = i + 1; j < items.length; j++) {
       const itemset1 = items[i].split(",");
       const itemset2 = items[j].split(",");
-
-      // Join step: Combine two itemsets if they differ by only the last item
       if (itemset1.slice(0, -1).join(",") === itemset2.slice(0, -1).join(",")) {
         const candidate = [...new Set([...itemset1, ...itemset2])].sort();
         if (!hasInfrequentSubset(candidate, frequentItemsets)) {
@@ -52,15 +48,12 @@ function aprioriGen(frequentItemsets) {
 
   return candidates;
 }
-//#endregion
-//#region  Check if a candidate itemset has any infrequent subset
+
 function hasInfrequentSubset(candidate, frequentItemsets) {
   const subsets = getSubsets(candidate, candidate.length - 1);
   return subsets.some((subset) => !frequentItemsets.has(subset.join(",")));
 }
-//#endregion
 
-//#region  Generate all subsets of a given size
 function getSubsets(array, size) {
   const subsets = [];
   const recurse = (start, subset) => {
@@ -77,14 +70,41 @@ function getSubsets(array, size) {
   recurse(0, []);
   return subsets;
 }
+
+function calculateConfidence(allFrequentItemsets) {
+  const rules = [];
+  allFrequentItemsets.forEach((level) => {
+    level.forEach((support, itemset) => {
+      const items = itemset.split(",");
+      const subsets = getSubsets(items, items.length - 1);
+
+      subsets.forEach((subset) => {
+        const subsetKey = subset.join(",");
+        const subsetSupport =
+          allFrequentItemsets[subset.length - 1]?.get(subsetKey);
+        if (subsetSupport) {
+          const confidence = support / subsetSupport;
+          if (confidence >= minConfidence) {
+            rules.push({
+              rule: `${subsetKey} => ${items
+                .filter((item) => !subset.includes(item))
+                .join(",")}`,
+              confidence: confidence.toFixed(2),
+            });
+          }
+        }
+      });
+    });
+  });
+  return rules;
+}
 //#endregion
 
-//#region  Apriori Algorithm
-function apriori(transactions, minSupport) {
+//#region main function and executable
+function main(transactions, minSupport) {
   const allFrequentItemsets = [];
   let frequentItemsets = new Map();
 
-  // Step 1: Generate frequent 1-itemsets
   const items = [...new Set(transactions.flat())];
   const candidates = items.map((item) => [item]);
   const counts = countSupport(transactions, candidates);
@@ -94,11 +114,8 @@ function apriori(transactions, minSupport) {
       frequentItemsets.set(key, count);
     }
   });
-
-  // Collect frequent itemsets for level 1
   allFrequentItemsets.push(frequentItemsets);
 
-  // Step 2: Iteratively generate candidates and find frequent itemsets
   let k = 2;
   while (frequentItemsets.size > 0) {
     const previousFrequentItemsets = new Set(frequentItemsets.keys());
@@ -119,18 +136,23 @@ function apriori(transactions, minSupport) {
     k++;
   }
 
-  return allFrequentItemsets;
-}
-//#endregion
+  const rules = calculateConfidence(allFrequentItemsets);
 
-//#region Executable
-const results = apriori(transactions, minSupport);
+  return { allFrequentItemsets, rules };
+}
+
+const results = main(transactions, minSupport);
 
 console.log("Frequent Itemsets:");
-results.forEach((level, index) => {
+results.allFrequentItemsets.forEach((level, index) => {
   console.log(`Level ${index + 1}:`);
   level.forEach((count, itemset) => {
     console.log(`  ${itemset}: ${count}`);
   });
+});
+
+console.log("\nAssociation Rules:");
+results.rules.forEach((rule) => {
+  console.log(`${rule.rule} (Confidence: ${rule.confidence})`);
 });
 //#endregion
